@@ -1,0 +1,52 @@
+# ROVIO configuration file
+
+doVECalibration: false    # Calibrate camera-IMU extrinsics
+depthType: 0             # 0: normal, 1: inverse depth
+verbose: false           # Verbose output
+
+Camera0:                 # Camera specific settings
+  CalibrationFile: "cfg/camera_calibration.yaml"  # Camera calibration file
+  qCM_x: 0.0            # Camera-IMU rotation quaternion x
+  qCM_y: 0.0            # Camera-IMU rotation quaternion y
+  qCM_z: 0.0            # Camera-IMU rotation quaternion z
+  qCM_w: 1.0            # Camera-IMU rotation quaternion w
+  MrMC_x: 0.0           # Camera-IMU translation x
+  MrMC_y: 0.0           # Camera-IMU translation y
+  MrMC_z: 0.0           # Camera-IMU translation z
+
+Init:
+  State:
+    pos_0: [0.0, 0.0, 0.0]           # Initial position
+    vel_0: [0.0, 0.0, 0.0]           # Initial velocity
+    acb_0: [0.0, 0.0, 0.0]           # Initial accelerometer bias
+    gyb_0: [0.0, 0.0, 0.0]           # Initial gyroscope bias
+    att_0: [0.0, 0.0, 0.0, 1.0]      # Initial attitude quaternion
+    
+  Covariance:
+    pos_0: 0.0001                     # Initial position covariance
+    vel_0: 0.0001                     # Initial velocity covariance
+    acb_0: 0.0001                     # Initial accelerometer bias covariance
+    gyb_0: 0.0001                     # Initial gyroscope bias covariance
+    att_0: 0.0001                     # Initial attitude covariance
+
+ImgUpdate:
+  updateVecNormTermination: 1e-4
+  maxNumIteration: 20
+  startLevel: 3
+  endLevel: 1
+  maxNoiseScore: 100
+  minNoiseScore: 0.4
+  minTrackedFeatureRatio: 0.3
+  minAbsoluteSTScore: 5
+  minRelativeSTScore: 0.2
+  minTimeBetweenPatchUpdate: 1.0
+  fastDetectionThreshold: 10
+  alignConvergencePixelRange: 10
+  alignCoverageRatio: 2
+  alignMaxUniSample: 10
+  useDirectMethod: true
+  doFrameVisualisation: true
+  visualizePatches: true
+  removeNegativeFeatureAfterUpdate: true
+  useCrossCameraMeasurements: true
+  doStereoInitialization: true

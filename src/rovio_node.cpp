@@ -28,18 +28,20 @@
 
 
 #include <memory>
-
-#include <Eigen/StdVector>
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#include <ros/ros.h>
-#include <ros/package.h>
-#include <geometry_msgs/Pose.h>
-#pragma GCC diagnostic pop
+#include <string>
+#include <iostream>
+#include <eigen3/Eigen/StdVector>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/features2d.hpp>
 
 #include "rovio/RovioFilter.hpp"
-#include "rovio/RovioNode.hpp"
+#include "rovio/Camera.hpp"
+#include "rovio/FeatureCoordinates.hpp"
+#include "rovio/FeatureDistance.hpp"
+#include "rovio/ImagePyramid.hpp"
+
 #ifdef MAKE_SCENE
 #include "rovio/RovioScene.hpp"
 #endif
@@ -53,7 +55,7 @@ static constexpr int nMax_ = 25; // Maximal number of considered features in the
 #ifdef ROVIO_NLEVELS
 static constexpr int nLevels_ = ROVIO_NLEVELS;
 #else
-static constexpr int nLevels_ = 4; // // Total number of pyramid levels considered.
+static constexpr int nLevels_ = 4; // Total number of pyramid levels considered.
 #endif
 
 #ifdef ROVIO_PATCHSIZE
@@ -80,49 +82,103 @@ typedef rovio::RovioFilter<rovio::FilterState<nMax_,nLevels_,patchSize_,nCam_,nP
 static rovio::RovioScene<mtFilter> mRovioScene;
 
 void idleFunc(){
-  ros::spinOnce();
-  mRovioScene.drawScene(mRovioScene.mpFilter_->safe_);
+    mRovioScene.drawScene(mRovioScene.mpFilter_->safe_);
 }
 #endif
 
-int main(int argc, char** argv){
-  ros::init(argc, argv, "rovio");
-  ros::NodeHandle nh;
-  ros::NodeHandle nh_private("~");
-
-  std::string rootdir = ros::package::getPath("rovio"); // Leaks memory
-  std::string filter_config = rootdir + "/cfg/rovio.info";
-
-  nh_private.param("filter_config", filter_config, filter_config);
-
-  // Filter
-  std::shared_ptr<mtFilter> mpFilter(new mtFilter);
-  mpFilter->readFromInfo(filter_config);
-
-  // Force the camera calibration paths to the ones from ROS parameters.
-  for (unsigned int camID = 0; camID < nCam_; ++camID) {
-    std::string camera_config;
-    if (nh_private.getParam("camera" + std::to_string(camID)
-                            + "_config", camera_config)) {
-      mpFilter->cameraCalibrationFile_[camID] = camera_config;
+class RovioStandalone {
+public:
+    RovioStandalone(const std::string& config_file) {
+        mpFilter = std::make_shared<mtFilter>();
+        mpFilter->readFromInfo(config_file);
+        mpFilter->refreshProperties();
     }
-  }
-  mpFilter->refreshProperties();
 
-  // Node
-  rovio::RovioNode<mtFilter> rovioNode(nh, nh_private, mpFilter);
-  rovioNode.makeTest();
+    void processImage(const cv::Mat& image, double timestamp) {
+        // TODO: Implement image processing pipeline
+        // This would replace the ROS subscriber callbacks
+    }
 
+    void reset() {
+        mpFilter->reset();
+    }
+
+private:
+    std::shared_ptr<mtFilter> mpFilter;
+};
+
+void printUsage(const char* progName) {
+    std::cout << "Usage: " << progName << " <config_file> [options]\n"
+              << "Options:\n"
+              << "  --camera <index>    Camera index (default: 0)\n"
+              << "  --video <path>      Video file path\n"
+              << "  --help              Show this help message\n";
+}
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        printUsage(argv[0]);
+        return 1;
+    }
+
+    std::string config_file = argv[1];
+    std::string video_source = "";
+    int camera_index = 0;
+
+    for (int i = 2; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--camera" && i + 1 < argc) {
+            camera_index = std::stoi(argv[++i]);
+        } else if (arg == "--video" && i + 1 < argc) {
+            video_source = argv[++i];
+        } else if (arg == "--help") {
+            printUsage(argv[0]);
+            return 0;
+        }
+    }
+
+    try {
+        RovioStandalone rovio(config_file);
+        cv::VideoCapture cap;
+
+        if (!video_source.empty()) {
+            cap.open(video_source);
+        } else {
+            cap.open(camera_index);
+        }
+
+        if (!cap.isOpened()) {
+            std::cerr << "Error: Could not open video source\n";
+            return 1;
+        }
+
+        cv::Mat frame;
+        double timestamp = 0.0;
+        
 #ifdef MAKE_SCENE
-  // Scene
-  std::string mVSFileName = rootdir + "/shaders/shader.vs";
-  std::string mFSFileName = rootdir + "/shaders/shader.fs";
-  mRovioScene.initScene(argc,argv,mVSFileName,mFSFileName,mpFilter);
-  mRovioScene.setIdleFunction(idleFunc);
-  mRovioScene.addKeyboardCB('r',[&rovioNode]() mutable {rovioNode.requestReset();});
-  glutMainLoop();
+        // Initialize visualization if enabled
+        std::string mVSFileName = "shaders/shader.vs";
+        std::string mFSFileName = "shaders/shader.fs";
+        mRovioScene.initScene(argc, argv, mVSFileName, mFSFileName, rovio.mpFilter);
+        mRovioScene.setIdleFunction(idleFunc);
+        glutMainLoop();
 #else
-  ros::spin();
+        while (cap.read(frame)) {
+            timestamp = cv::getTickCount() / cv::getTickFrequency();
+            rovio.processImage(frame, timestamp);
+            
+            cv::imshow("ROVIO", frame);
+            char key = cv::waitKey(1);
+            if (key == 27) // ESC key
+                break;
+            else if (key == 'r')
+                rovio.reset();
+        }
 #endif
-  return 0;
+
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
 }

@@ -1,0 +1,27 @@
+%YAML:1.0
+
+# Camera calibration parameters
+Camera0:
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0, 0.0]  # k1, k2, p1, p2, k3
+  camera_matrix: [525.0, 0.0, 319.5, 0.0, 525.0, 239.5, 0.0, 0.0, 1.0]  # fx, 0, cx, 0, fy, cy, 0, 0, 1
+  resolution: [640, 480]  # width, height
+
+# Feature tracking parameters
+max_features: 25
+patch_size: 6
+pyramid_levels: 4
+
+# Filter parameters
+init_pose: [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]  # x, y, z, qw, qx, qy, qz
+init_velocity: [0.0, 0.0, 0.0]  # vx, vy, vz
+init_bias_gyro: [0.0, 0.0, 0.0]  # bwx, bwy, bwz
+init_bias_acc: [0.0, 0.0, 0.0]  # bax, bay, baz
+
+# Process noise
+sigma_gyro: 0.01
+sigma_acc: 0.1
+sigma_feature: 0.01
+
+# Update parameters
+update_rate: 30.0  # Hz
+feature_min_distance: 30.0  # pixels 
